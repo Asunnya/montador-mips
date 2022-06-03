@@ -12,17 +12,30 @@ def read_instructions() -> tuple:
     types = dict()
     opcodes = dict()
     functions = dict()
+
     for line in open("instructions.txt", 'r').readlines():
         line = line[:-1].split(';')
         types[line[0]] = line[1]
         opcodes[line[0]] = line[2]
         if line[1] == 'r':
             functions[line[0]] = line[3]
+
     return types, opcodes, functions
+
+
+def read_registers() -> dict:
+    registers = dict()
+
+    for line in open("registers.txt", 'r').readlines():
+        line = line[:1].split(';')
+        registers[line[0]] = line[1]
+
+    return registers
 
 
 class Instruction:
     type_dict, opcode_dict, function_dict = read_instructions()
+    register_dict = read_registers()
 
     def __init__(self, name: str):
         self.opcode = Instruction.opcode_dict[name]
