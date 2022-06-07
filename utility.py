@@ -42,14 +42,14 @@ class Instruction:
     type_dict, opcode_dict, function_dict = read_instructions()
     register_dict = read_registers()
 
-    def __init__(self, name: str, instruction_list: list, has_label_start: bool, has_label_final: bool):
+    def __init__(self, name: str, instruction_list: list, has_label_start: bool, has_label_final: bool, pos: int, labels: dict):
         self.name = name
         self.opcode = Instruction.opcode_dict[name]
         self.type = Instruction.type_dict[name]
         self.has_immediate = False
-        self.has_label_inicio = has_label_start
+        self.has_label_start = has_label_start
         self.has_label_final = has_label_final
-        # tratando os registradores sem tratar o caso do label
+        # tratando os registradores
         if self.type != "j":
             if self.name == "jr":
                 self.rs = Instruction.register_dict[instruction_list[1]]
@@ -69,8 +69,12 @@ class Instruction:
                     self.rs = Instruction.register_dict[rs]
                 else:
                     self.rs = Instruction.register_dict[instruction_list[2]]
+                if has_label_final:
+                    self.immediate = labels[instruction_list[-1]] - pos - 1
                 self.rt = Instruction.register_dict[instruction_list[1]]
-
+        else:
+            if has_label_final:
+                self.immediate = labels[instruction_list[-1]]
         # function and shamt sem tratar o label no final
         if self.type == "r":
             self.function = Instruction.function_dict[name]
@@ -89,16 +93,25 @@ class Instruction:
 
 def read_asm() -> list:
     pattern = r"[ ,]"
-    lista_de_instrucao = list()
+    instruction_list = list()
     for line in open("exemplo.asm", "r").readlines():
         line = re.split(pattern, line.replace("\n", "").lower())
         for i in range(line.count("")):
             line.remove("")
-        lista_de_instrucao.append(line)
-    return lista_de_instrucao
+        instruction_list.append(line)
+    return instruction_list
 
 
-def check_instruction(list_instruction: list):
+def create_labels(list_instruction: list[str]) -> dict:
+    labels = dict()
+    for i, instruction in enumerate(list_instruction):
+        if ":" in instruction[0]:
+            labels[instruction[0].replace(":", "")] = i
+
+    return labels
+
+
+def check_instruction(list_instruction: list, pos: int, labels: dict):
     last_word_instruction = list_instruction[-1]
     has_label_init = False
     has_label_final = False
@@ -109,9 +122,9 @@ def check_instruction(list_instruction: list):
         has_label_final = True
 
     if not has_label_init:
-        instruction_obj = Instruction(list_instruction[0], list_instruction, has_label_init, has_label_final)
+        instruction_obj = Instruction(list_instruction[0], list_instruction, has_label_init, has_label_final, pos, labels)
     else:
-        instruction_obj = Instruction(list_instruction[1], list_instruction, has_label_init, has_label_final)
+        instruction_obj = Instruction(list_instruction[1], list_instruction, has_label_init, has_label_final, pos, labels)
 
     if instruction_obj.type == 'i':
         instruction_obj.has_immediate = True
@@ -119,9 +132,9 @@ def check_instruction(list_instruction: list):
     return instruction_obj
 
 
-def transforming_instruction(list_instruction):
-    for l in list_instruction:
-        instruction_obj = check_instruction(l)
+def transforming_instruction(list_instruction: list, labels: dict):
+    for i, l in enumerate(list_instruction):
+        instruction_obj = check_instruction(l, i, labels)
 
         print(f'Nome = {instruction_obj.name}')
         print(f'Opcode = {instruction_obj.opcode}')
@@ -129,16 +142,13 @@ def transforming_instruction(list_instruction):
         if instruction_obj.type == "r":
             print(f'Shamt = {instruction_obj.shamt}')
             print(f'Function {instruction_obj.function}')
-        if (instruction_obj.type == "i" or instruction_obj.type == "j") and not instruction_obj.has_label_final:
+        if instruction_obj.type == "i" or instruction_obj.type == "j":
             print(f'Endereço/imediato = {instruction_obj.immediate}')
 
-        if instruction_obj.type != "j" and not instruction_obj.has_label_inicio:
+        if instruction_obj.type != "j" and not instruction_obj.has_label_start:
             print(f'RS = {instruction_obj.rs}')
             if instruction_obj.name != 'jr':
                 print(f'RT {instruction_obj.rt}')
                 if instruction_obj.type == "r":
                     print(f'RD {instruction_obj.rd}')
         print()
-
-
-transforming_instruction(read_asm())
