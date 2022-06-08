@@ -30,12 +30,26 @@ def dec_to_bin(dec_value: str, size: int) -> str:
     dec_value_int = int(dec_value)
 
     if dec_value_int < 0:
-        raise ValueError("Valor imediato negativo.")
+        if dec_value_int < -2 ** (size - 1):
+            raise ValueError("Valor imediato menor do que o tamanho suportado.")
+        else:
+            bin_value = format(dec_value_int, f"0{size+1}b")[1:].replace("1", "x").replace("0", "1").replace("x", "0")
+            neg_bin = ""
+            changed = False
+            for bit in bin_value[::-1]:
+                if not changed:
+                    if bit == "1":
+                        neg_bin += "0"
+                    else:
+                        neg_bin += "1"
+                        changed = True
+                else:
+                    neg_bin += bit
+            return neg_bin[::-1]
     elif dec_value_int >= 2 ** size:
         raise ValueError("Valor imediato maior do que o tamanho suportado.")
     else:
-        bin_value = bin(dec_value_int)[2:]
-        return "0" * (size - len(bin_value)) + bin_value
+        return format(dec_value_int, f"0{size}b")
 
 
 class Instruction:
@@ -70,11 +84,11 @@ class Instruction:
                 else:
                     self.rs = Instruction.register_dict[instruction_list[2]]
                 if has_label_final:
-                    self.immediate = labels[instruction_list[-1]] - pos - 1
+                    self.immediate = dec_to_bin(str(labels[instruction_list[-1]] - pos - 1), 16)
                 self.rt = Instruction.register_dict[instruction_list[1]]
         else:
             if has_label_final:
-                self.immediate = labels[instruction_list[-1]]
+                self.immediate = dec_to_bin(str(labels[instruction_list[-1]]), 26)
         # function and shamt sem tratar o label no final
         if self.type == "r":
             self.function = Instruction.function_dict[name]
@@ -152,3 +166,6 @@ def transforming_instruction(list_instruction: list, labels: dict):
                 if instruction_obj.type == "r":
                     print(f'RD {instruction_obj.rd}')
         print()
+
+
+print(dec_to_bin("5", 8))
