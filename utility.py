@@ -1,4 +1,6 @@
 import re
+from bitarray import bitarray
+
 
 def read_instructions() -> tuple:
     types = dict()
@@ -32,7 +34,7 @@ def dec_to_bin(dec_value: str, size: int) -> str:
         if dec_value_int < -2 ** (size - 1):
             raise ValueError("Valor imediato menor do que o tamanho suportado.")
         else:
-            bin_value = format(dec_value_int, f"0{size+1}b")[1:].replace("1", "x").replace("0", "1").replace("x", "0")
+            bin_value = format(dec_value_int, f"0{size + 1}b")[1:].replace("1", "x").replace("0", "1").replace("x", "0")
             neg_bin = ""
             changed = False
             for bit in bin_value[::-1]:
@@ -55,7 +57,8 @@ class Instruction:
     type_dict, opcode_dict, function_dict = read_instructions()
     register_dict = read_registers()
 
-    def __init__(self, name: str, instruction_list: list, has_label_start: bool, has_label_final: bool, pos: int, labels: dict):
+    def __init__(self, name: str, instruction_list: list, has_label_start: bool, has_label_final: bool, pos: int,
+                 labels: dict):
         self.name = name
         self.opcode = Instruction.opcode_dict[name]
         self.type = Instruction.type_dict[name]
@@ -151,8 +154,10 @@ def bitstring_to_bytes(s):
     return int(s, 2).to_bytes((len(s) + 7) // 8, byteorder='big')
 
 
-def bitstring_to_bytes2(s) -> bytes:
-    return int(s, 2).to_bytes(1, 'big')
+def file_write(instruction: str, file):
+    for i in instruction:
+        i = bitstring_to_bytes(i)
+        file.write(i)
 
 
 def transforming_instruction(list_instruction: list, labels: dict):
@@ -162,30 +167,29 @@ def transforming_instruction(list_instruction: list, labels: dict):
         with open("saida.bin", "wb") as file:
             print(f'Nome = {instruction_obj.name}')
             print(f'Opcode = {instruction_obj.opcode}')
-            file.write(bitstring_to_bytes(instruction_obj.opcode))
+            file_write(instruction_obj.opcode, file)
             print(f'Tipo = {instruction_obj.type}')
 
             if instruction_obj.type != "j" and not instruction_obj.has_label_start:
                 print(f'RS = {instruction_obj.rs}')
-                file.write(bitstring_to_bytes(instruction_obj.rs))
+                file_write(instruction_obj.rs, file)
                 if instruction_obj.name != 'jr':
                     print(f'RT {instruction_obj.rt}')
-                    file.write(bitstring_to_bytes(instruction_obj.rt))
+                    file_write(instruction_obj.rt, file)
                     if instruction_obj.type == "r":
                         print(f'RD {instruction_obj.rd}')
-                        file.write(bitstring_to_bytes(instruction_obj.rd))
+                        file_write(instruction_obj.rd, file)
 
             if instruction_obj.type == "r":
                 print(f'Shamt = {instruction_obj.shamt}')
                 print(f'Function {instruction_obj.function}')
-                file.write(bitstring_to_bytes(instruction_obj.shamt))
-                file.write(bitstring_to_bytes(instruction_obj.function))
+                file_write(instruction_obj.shamt, file)
+                file_write(instruction_obj.function, file)
             if instruction_obj.type == "i" or instruction_obj.type == "j":
                 print(f'Endereço/imediato = {instruction_obj.immediate}')
-                file.write(bitstring_to_bytes(instruction_obj.immediate))
+                file_write(instruction_obj.immediate, file)
 
 
 def to_read():
     with open("saida.bin", "rb") as file:
-        c = BitArray(file.read(4))
-        print(c.bin)
+        print(file.read(4))
