@@ -2,7 +2,8 @@ import re
 from bitarray import bitarray
 
 
-def read_instructions() -> tuple:
+def read_instructions() -> tuple[dict[str, str], dict[str, str], dict[str, str]]:
+    """Generates dictionaries of types, opcodes and functions. Returns a tuple with each one mapping name to binary value."""
     types = dict()
     opcodes = dict()
     functions = dict()
@@ -17,7 +18,8 @@ def read_instructions() -> tuple:
     return types, opcodes, functions
 
 
-def read_registers() -> dict:
+def read_registers() -> dict[str, str]:
+    """Generates a dictionary mapping register name to its binary value."""
     registers = dict()
 
     for line in open("base/registers.txt", 'r').readlines():
@@ -28,6 +30,7 @@ def read_registers() -> dict:
 
 
 def dec_to_bin(dec_value: str, size: int) -> str:
+    """Receives a string of a decimal value and the number of bits for the output and returns its conversion formated."""
     dec_value_int = int(dec_value)
 
     if dec_value_int < 0:
@@ -112,7 +115,17 @@ class Instruction:
                 self.immediate = dec_to_bin(immediate, 16)
             self.immediate = dec_to_bin(immediate, 16)
 
-    def info(self):
+    def bits(self) -> str:
+        """Returns full 32-bit instruction."""
+        if self.type == "r":
+            return self.opcode + self.rs + self.rt + self.rd + self.shamt + self.function
+        elif self.type == "i":
+            return self.opcode + self.rs + self.rt + self.immediate
+        else:
+            return self.opcode + self.immediate
+
+    def info(self) -> None:
+        """Prints each object attribute."""
         print(f'Nome = {self.name}')
         print(f'Opcode = {self.opcode}')
         print(f'Tipo = {self.type}')
@@ -133,6 +146,7 @@ class Instruction:
 
 
 def read_asm() -> list:
+    """Reads the input file and returns a list with each line as an element. If there is not an input file 'entrada.asm', it reads the default 'exemplo.asm' file."""
     pattern = r"[ ,]"
     instruction_list = list()
     try:
@@ -148,6 +162,7 @@ def read_asm() -> list:
 
 
 def create_labels(list_instruction: list[str]) -> dict:
+    """Generates an dictionary mapping each label of the input file to its corresponding line (starting from 0)."""
     labels = dict()
     for i, instruction in enumerate(list_instruction):
         if ":" in instruction[0]:
@@ -156,7 +171,8 @@ def create_labels(list_instruction: list[str]) -> dict:
     return labels
 
 
-def check_instruction(list_instruction: list, pos: int, labels: dict):
+def check_instruction(list_instruction: list, pos: int, labels: dict) -> Instruction:
+    """Generates and returns an object of the instruction."""
     last_word_instruction = list_instruction[-1]
     has_label_init = False
     has_label_final = False
@@ -179,37 +195,35 @@ def check_instruction(list_instruction: list, pos: int, labels: dict):
     return instruction_obj
 
 
-def bitstring_to_bytes(s):
-    return int(s, 2).to_bytes((len(s) + 7) // 8, byteorder='little')
+def transforming_instruction(list_instruction: list, labels: dict, txt: bool) -> None:
+    """Generates the output file. If '-t' flag is used, then the output file is a 'txt'. Otherwise, it is a 'bin' file."""
+    if txt:
+        with open("saida.txt", "w") as file:
+            for i, l in enumerate(list_instruction):
+                instruction_obj = check_instruction(l, i, labels)
+                file.write(f"{instruction_obj.bits()}\n")
+            file.close()
+    else:
+        with open("saida.bin", "wb") as file:
+            output = bitarray(32 * len(list_instruction))
+            for i, l in enumerate(list_instruction):
+                instruction_obj = check_instruction(l, i, labels)
+                for j, byte in enumerate(instruction_obj.bits()):
+                    output[i*32 + j] = int(byte)
+            output.tofile(file)
+            file.close()
 
 
-def file_write(instruction: str, file):
-    for i in instruction:
-        i = bitstring_to_bytes(i)
-        file.write(i)
-
-
-def transforming_instruction(list_instruction: list, labels: dict):
-    with open("saida.bin", "wb") as file:
-        output = bitarray(32*len(list_instruction))
-        for i, l in enumerate(list_instruction):
-            instruction_obj = check_instruction(l, i, labels)
-            # instruction_obj.info()
-
-            if instruction_obj.type == "r":
-                instruction = instruction_obj.opcode + instruction_obj.rs + instruction_obj.rt + instruction_obj.rd + instruction_obj.shamt + instruction_obj.function
-            elif instruction_obj.type == "i":
-                instruction = instruction_obj.opcode + instruction_obj.rs + instruction_obj.rt + instruction_obj.immediate
-            else:
-                instruction = instruction_obj.opcode + instruction_obj.immediate
-            for j, byte in enumerate(instruction):
-                output[i*32 + j] = int(byte)
-        output.tofile(file)
-
-
-def to_read():
-    with open("saida.bin", "rb") as file:
-        byte = file.read(4)
-        while byte:
-            print(format(int.from_bytes(byte, byteorder="little"), f"032b"))
+def to_read(txt: bool) -> None:
+    """Prints each line of the corresponding output file."""
+    if txt:
+        with open("saida.txt", "r") as file:
+            print(file.read())
+            file.close()
+    else:
+        with open("saida.bin", "rb") as file:
             byte = file.read(4)
+            while byte:
+                print(format(int.from_bytes(byte, byteorder="big"), f"032b"))
+                byte = file.read(4)
+            file.close()
