@@ -1,6 +1,5 @@
 import re
 
-
 def read_instructions() -> tuple:
     types = dict()
     opcodes = dict()
@@ -136,9 +135,11 @@ def check_instruction(list_instruction: list, pos: int, labels: dict):
         has_label_final = True
 
     if not has_label_init:
-        instruction_obj = Instruction(list_instruction[0], list_instruction, has_label_init, has_label_final, pos, labels)
+        instruction_obj = Instruction(list_instruction[0], list_instruction, has_label_init, has_label_final, pos,
+                                      labels)
     else:
-        instruction_obj = Instruction(list_instruction[1], list_instruction, has_label_init, has_label_final, pos, labels)
+        instruction_obj = Instruction(list_instruction[1], list_instruction, has_label_init, has_label_final, pos,
+                                      labels)
 
     if instruction_obj.type == 'i':
         instruction_obj.has_immediate = True
@@ -146,26 +147,45 @@ def check_instruction(list_instruction: list, pos: int, labels: dict):
     return instruction_obj
 
 
+def bitstring_to_bytes(s):
+    return int(s, 2).to_bytes((len(s) + 7) // 8, byteorder='big')
+
+
+def bitstring_to_bytes2(s) -> bytes:
+    return int(s, 2).to_bytes(1, 'big')
+
+
 def transforming_instruction(list_instruction: list, labels: dict):
     for i, l in enumerate(list_instruction):
         instruction_obj = check_instruction(l, i, labels)
 
-        print(f'Nome = {instruction_obj.name}')
-        print(f'Opcode = {instruction_obj.opcode}')
-        print(f'Tipo = {instruction_obj.type}')
-        if instruction_obj.type == "r":
-            print(f'Shamt = {instruction_obj.shamt}')
-            print(f'Function {instruction_obj.function}')
-        if instruction_obj.type == "i" or instruction_obj.type == "j":
-            print(f'Endereço/imediato = {instruction_obj.immediate}')
+        with open("saida.bin", "wb") as file:
+            print(f'Nome = {instruction_obj.name}')
+            print(f'Opcode = {instruction_obj.opcode}')
+            file.write(bitstring_to_bytes(instruction_obj.opcode))
+            print(f'Tipo = {instruction_obj.type}')
 
-        if instruction_obj.type != "j" and not instruction_obj.has_label_start:
-            print(f'RS = {instruction_obj.rs}')
-            if instruction_obj.name != 'jr':
-                print(f'RT {instruction_obj.rt}')
-                if instruction_obj.type == "r":
-                    print(f'RD {instruction_obj.rd}')
-        print()
+            if instruction_obj.type != "j" and not instruction_obj.has_label_start:
+                print(f'RS = {instruction_obj.rs}')
+                file.write(bitstring_to_bytes(instruction_obj.rs))
+                if instruction_obj.name != 'jr':
+                    print(f'RT {instruction_obj.rt}')
+                    file.write(bitstring_to_bytes(instruction_obj.rt))
+                    if instruction_obj.type == "r":
+                        print(f'RD {instruction_obj.rd}')
+                        file.write(bitstring_to_bytes(instruction_obj.rd))
+
+            if instruction_obj.type == "r":
+                print(f'Shamt = {instruction_obj.shamt}')
+                print(f'Function {instruction_obj.function}')
+                file.write(bitstring_to_bytes(instruction_obj.shamt))
+                file.write(bitstring_to_bytes(instruction_obj.function))
+            if instruction_obj.type == "i" or instruction_obj.type == "j":
+                print(f'Endereço/imediato = {instruction_obj.immediate}')
+                file.write(bitstring_to_bytes(instruction_obj.immediate))
 
 
-print(dec_to_bin("5", 8))
+def to_read():
+    with open("saida.bin", "rb") as file:
+        c = BitArray(file.read(4))
+        print(c.bin)
