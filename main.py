@@ -1,10 +1,9 @@
 from utility import *
+from sys import argv
 
 lista = read_asm()
 labels = create_labels(lista)
 
-print(lista)
-print(labels)
-
 transforming_instruction(lista, labels)
-to_read()
+if "-v" in argv:
+    to_read()

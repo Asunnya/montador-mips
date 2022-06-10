@@ -67,27 +67,33 @@ class Instruction:
         self.has_label_final = has_label_final
         # tratando os registradores
         if self.type != "j":
+            if has_label_start:
+                offset = 1
+            else:
+                offset = 0
             if self.name == "jr":
-                self.rs = Instruction.register_dict[instruction_list[1]]
-            elif self.type == "r" and not has_label_start:
+                self.rs = Instruction.register_dict[instruction_list[1 + offset]]
+                self.rt = dec_to_bin("0", 5)
+                self.rd = dec_to_bin("0", 5)
+            elif self.type == "r":
                 if name != "sll" and name != "srl":
-                    self.rd = Instruction.register_dict[instruction_list[1]]
-                    self.rs = Instruction.register_dict[instruction_list[2]]
-                    self.rt = Instruction.register_dict[instruction_list[3]]
+                    self.rd = Instruction.register_dict[instruction_list[1 + offset]]
+                    self.rs = Instruction.register_dict[instruction_list[2 + offset]]
+                    self.rt = Instruction.register_dict[instruction_list[3 + offset]]
                 else:
-                    self.rs = dec_to_bin('0', 5)
-                    self.rt = Instruction.register_dict[instruction_list[1]]
-                    self.rd = Instruction.register_dict[instruction_list[2]]
-            elif self.type == "i" and not has_label_start:
+                    self.rs = Instruction.register_dict[instruction_list[1 + offset]]
+                    self.rt = dec_to_bin("0", 5)
+                    self.rd = Instruction.register_dict[instruction_list[2 + offset]]
+            elif self.type == "i":
                 if name == 'lw' or name == 'sw':
                     rs = instruction_list[-1]
                     rs = rs.split("(")[1].replace(")", '')
                     self.rs = Instruction.register_dict[rs]
                 else:
-                    self.rs = Instruction.register_dict[instruction_list[2]]
+                    self.rs = Instruction.register_dict[instruction_list[2 + offset]]
                 if has_label_final:
                     self.immediate = dec_to_bin(str(labels[instruction_list[-1]] - pos - 1), 16)
-                self.rt = Instruction.register_dict[instruction_list[1]]
+                self.rt = Instruction.register_dict[instruction_list[1 + offset]]
         else:
             if has_label_final:
                 self.immediate = dec_to_bin(str(labels[instruction_list[-1]]), 26)
@@ -106,11 +112,34 @@ class Instruction:
                 self.immediate = dec_to_bin(immediate, 16)
             self.immediate = dec_to_bin(immediate, 16)
 
+    def info(self):
+        print(f'Nome = {self.name}')
+        print(f'Opcode = {self.opcode}')
+        print(f'Tipo = {self.type}')
+
+        if self.type != "j" and not self.has_label_start:
+            print(f'RS = {self.rs}')
+            if self.name != 'jr':
+                print(f'RT {self.rt}')
+                if self.type == "r":
+                    print(f'RD {self.rd}')
+
+        if self.type == "r":
+            print(f'Shamt = {self.shamt}')
+            print(f'Function {self.function}')
+        if self.type == "i" or self.type == "j":
+            print(f'Endereço/imediato = {self.immediate}')
+        print()
+
 
 def read_asm() -> list:
     pattern = r"[ ,]"
     instruction_list = list()
-    for line in open("exemplo.asm", "r").readlines():
+    try:
+        file = open("entrada.asm", "r")
+    except FileNotFoundError:
+        file = open("exemplo.asm", "r")
+    for line in file.readlines():
         line = re.split(pattern, line.replace("\n", "").lower())
         for i in range(line.count("")):
             line.remove("")
@@ -151,7 +180,7 @@ def check_instruction(list_instruction: list, pos: int, labels: dict):
 
 
 def bitstring_to_bytes(s):
-    return int(s, 2).to_bytes((len(s) + 7) // 8, byteorder='big')
+    return int(s, 2).to_bytes((len(s) + 7) // 8, byteorder='little')
 
 
 def file_write(instruction: str, file):
@@ -161,35 +190,26 @@ def file_write(instruction: str, file):
 
 
 def transforming_instruction(list_instruction: list, labels: dict):
-    for i, l in enumerate(list_instruction):
-        instruction_obj = check_instruction(l, i, labels)
-
-        with open("saida.bin", "wb") as file:
-            print(f'Nome = {instruction_obj.name}')
-            print(f'Opcode = {instruction_obj.opcode}')
-            file_write(instruction_obj.opcode, file)
-            print(f'Tipo = {instruction_obj.type}')
-
-            if instruction_obj.type != "j" and not instruction_obj.has_label_start:
-                print(f'RS = {instruction_obj.rs}')
-                file_write(instruction_obj.rs, file)
-                if instruction_obj.name != 'jr':
-                    print(f'RT {instruction_obj.rt}')
-                    file_write(instruction_obj.rt, file)
-                    if instruction_obj.type == "r":
-                        print(f'RD {instruction_obj.rd}')
-                        file_write(instruction_obj.rd, file)
+    with open("saida.bin", "wb") as file:
+        output = bitarray(32*len(list_instruction))
+        for i, l in enumerate(list_instruction):
+            instruction_obj = check_instruction(l, i, labels)
+            # instruction_obj.info()
 
             if instruction_obj.type == "r":
-                print(f'Shamt = {instruction_obj.shamt}')
-                print(f'Function {instruction_obj.function}')
-                file_write(instruction_obj.shamt, file)
-                file_write(instruction_obj.function, file)
-            if instruction_obj.type == "i" or instruction_obj.type == "j":
-                print(f'Endereço/imediato = {instruction_obj.immediate}')
-                file_write(instruction_obj.immediate, file)
+                instruction = instruction_obj.opcode + instruction_obj.rs + instruction_obj.rt + instruction_obj.rd + instruction_obj.shamt + instruction_obj.function
+            elif instruction_obj.type == "i":
+                instruction = instruction_obj.opcode + instruction_obj.rs + instruction_obj.rt + instruction_obj.immediate
+            else:
+                instruction = instruction_obj.opcode + instruction_obj.immediate
+            for j, byte in enumerate(instruction):
+                output[i*32 + j] = int(byte)
+        output.tofile(file)
 
 
 def to_read():
     with open("saida.bin", "rb") as file:
-        print(file.read(4))
+        byte = file.read(4)
+        while byte:
+            print(format(int.from_bytes(byte, byteorder="little"), f"032b"))
+            byte = file.read(4)
